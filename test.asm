@@ -1,6 +1,6 @@
 ; ******************************************************************************
 ; * Algoritmo de Controle de LEDs - PIC16F628A                                 *
-; * Autor: ARTHUR G. BREGUEZ  & JOAO VICTOR      Data: 26/03/2025              *
+; * Autor: ARTHUR G. BREGUEZ  & JOAO VICTOR      Data: 09/04/2025              *
 ; ******************************************************************************
 
 #include <P16F628A.INC>
@@ -23,6 +23,7 @@
         DELAY_VAR1
         DELAY_VAR2
         INPUT_VALUE
+        TEMP
     ENDC
 
 ; ============================================================================== 
@@ -77,14 +78,24 @@ CHECK_RA3:
     BCF     PORTB, 2        ; Apaga RB2
 
 UPDATE_LEDS:
-    ; Verifica se INPUT_VALUE ≠ 000
+    ; Verifica se INPUT_VALUE é 000
     MOVF    INPUT_VALUE, W  ; Carrega INPUT_VALUE em W
-    ANDLW   b'00000111'     ; Máscara para os 3 bits (evita lixo)
-    BZ      LEDS_OFF        ; Se INPUT_VALUE = 000, apaga LEDs
+    ANDLW   b'00000111'     ; Máscara para os 3 bits
+    BZ      LEDS_OFF        ; Se for zero, apaga os LEDs
 
-    ; Exibe o valor em RB4-RB7
-    SWAPF   INPUT_VALUE, W  ; Desloca 4 bits para a esquerda
-    MOVWF   PORTB           ; Atualiza PORTB (RB4-RB7)
+    ; Multiplica o valor por 3
+    MOVWF   TEMP            ; Salva o valor mascarado em TEMP
+    ADDWF   TEMP, W         ; W = TEMP + W (2 * input)
+    ADDWF   TEMP, W         ; W = TEMP + W (3 * input)
+
+    ANDLW   b'00001111'     ; Máscara de 4 bits no resultado
+
+
+    ; Prepara para exibir no PORTB (RB4-RB7)
+    MOVWF   TEMP            ; Armazena o resultado em TEMP
+    SWAPF   TEMP, W         ; Troca os nibbles (desloca 4 bits para a esquerda)
+    MOVWF   PORTB           ; Escreve no PORTB
+
     GOTO    MAIN_LOOP
 
 LEDS_OFF:

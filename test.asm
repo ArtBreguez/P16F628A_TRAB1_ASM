@@ -3,7 +3,7 @@
 ; * Autor: ARTHUR G. BREGUEZ  & JOAO VICTOR      Data: 26/03/2025              *
 ; ******************************************************************************
 
-#include <P16F628A.INC>                     ; Inclui definicoes do PIC16F628A
+#include <P16F628A.INC>
 
 ; ============================================================================== 
 ; CONFIGURACOES DO MICROCONTROLADOR
@@ -13,74 +13,98 @@
 ; ==============================================================================
 ; DEFINICOES DE BANCOS DE MEMORIA
 ; ==============================================================================
-#define BANK0  BCF STATUS,RP0               ; Seleciona Banco 0
-#define BANK1  BSF STATUS,RP0               ; Seleciona Banco 1
+#define BANK0  BCF STATUS,RP0
+#define BANK1  BSF STATUS,RP0
 
 ; ============================================================================== 
 ; VARIAVEIS
 ; ==============================================================================
-    CBLOCK 0x20                             ; Endereco inicial das variaveis
-        DELAY_VAR1                          ; Variavel auxiliar para delays
-        DELAY_VAR2                          ; Variavel auxiliar para delays
-        INPUT_VALUE                         ; Armazena o valor de 3 bits lidos dos botoes
+    CBLOCK 0x20
+        DELAY_VAR1
+        DELAY_VAR2
+        INPUT_VALUE
     ENDC
 
 ; ============================================================================== 
 ; INICIO DO PROGRAMA
 ; ==============================================================================
-    ORG 0x00                                ; Define origem do programa em 0x00
-    GOTO INICIO                             ; Pula para a rotina de inicializacao
+    ORG 0x00
+    GOTO INIT
+
+; ============================================================================== 
+; ROTINA DE INICIALIZACAO
+; ==============================================================================
+INIT:
+    BANK1
+    MOVLW   b'00001110'     ; RA1, RA2, RA3 como entrada
+    MOVWF   TRISA
+    MOVLW   b'00000000'     ; PORTB como saida
+    MOVWF   TRISB
+    BANK0
+    CLRF    PORTB           ; Inicializa PORTB em 0
+    CLRF    INPUT_VALUE     ; Inicializa INPUT_VALUE
 
 ; ============================================================================== 
 ; ROTINA PRINCIPAL
 ; ==============================================================================
-INICIO:
-    BANK1                                   ; Acessa Banco 1 para configuracao
-    MOVLW   b'00001110'                     ; RA1, RA2 e RA3 como entrada
-    MOVWF   TRISA                           
-    MOVLW   b'00000000'                     ; PORTB como saida
-    MOVWF   TRISB                           
-    BANK0                                   ; Retorna ao Banco 0
-    CLRF    PORTB                           ; Inicializa PORTB em 0
-    CLRF    INPUT_VALUE                     ; Inicializa variavel de entrada como 0
+MAIN_LOOP:
+    CLRF    INPUT_VALUE     ; Reseta INPUT_VALUE a cada ciclo
 
-    ; Acende LED RB0 e aguarda
-    BSF     PORTB, 0                        ; Acende LED RB0
-    CALL    DELAY                           ; Aguarda t segundos
-    BCF     PORTB, 0                        ; Apaga LED RB0
-    BTFSC   PORTA, 1                        ; Verifica se RA1 esta pressionado
-    BSF     INPUT_VALUE, 0                  ; Define bit 0 de INPUT_VALUE se RA1 estiver pressionado
+    ; Verifica RA1 (Bit 0)
+    BSF     PORTB, 0        ; Acende RB0 temporariamente
+    CALL    DELAY
+    BTFSC   PORTA, 1        ; Botão RA1 pressionado (nível lógico baixo)?
+    GOTO    CHECK_RA2       ; Não: pula para próxima verificação
+    BSF     INPUT_VALUE, 0  ; Sim: Define bit 0
+CHECK_RA2:
+    BCF     PORTB, 0        ; Apaga RB0
 
-    ; Acende LED RB1 e aguarda
-    BSF     PORTB, 1                        ; Acende LED RB1
-    CALL    DELAY                           ; Aguarda t segundos
-    BCF     PORTB, 1                        ; Apaga LED RB1
-    BTFSC   PORTA, 2                        ; Verifica se RA2 esta pressionado
-    BSF     INPUT_VALUE, 1                  ; Define bit 1 de INPUT_VALUE se RA2 estiver pressionado
+    ; Verifica RA2 (Bit 1)
+    BSF     PORTB, 1        ; Acende RB1 temporariamente
+    CALL    DELAY
+    BTFSC   PORTA, 2        ; Botão RA2 pressionado (nível lógico baixo)?
+    GOTO    CHECK_RA3       ; Não: pula para próxima verificação
+    BSF     INPUT_VALUE, 1  ; Sim: Define bit 1
+CHECK_RA3:
+    BCF     PORTB, 1        ; Apaga RB1
 
-    ; Acende LED RB2 e aguarda
-    BSF     PORTB, 2                        ; Acende LED RB2
-    CALL    DELAY                           ; Aguarda t segundos
-    BCF     PORTB, 2                        ; Apaga LED RB2
-    BTFSC   PORTA, 3                        ; Verifica se RA3 esta pressionado
-    BSF     INPUT_VALUE, 2                  ; Define bit 2 de INPUT_VALUE se RA3 estiver pressionado
+    ; Verifica RA3 (Bit 2)
+    BSF     PORTB, 2        ; Acende RB2 temporariamente
+    CALL    DELAY
+    BTFSC   PORTA, 3        ; Botão RA3 pressionado (nível lógico baixo)?
+    GOTO    UPDATE_LEDS     ; Não: pula para atualização dos LEDs
+    BSF     INPUT_VALUE, 2  ; Sim: Define bit 2
+    BCF     PORTB, 2        ; Apaga RB2
 
-    GOTO    INICIO                          ; Reinicia o processo
+UPDATE_LEDS:
+    ; Verifica se INPUT_VALUE ≠ 000
+    MOVF    INPUT_VALUE, W  ; Carrega INPUT_VALUE em W
+    ANDLW   b'00000111'     ; Máscara para os 3 bits (evita lixo)
+    BZ      LEDS_OFF        ; Se INPUT_VALUE = 000, apaga LEDs
+
+    ; Exibe o valor em RB4-RB7
+    SWAPF   INPUT_VALUE, W  ; Desloca 4 bits para a esquerda
+    MOVWF   PORTB           ; Atualiza PORTB (RB4-RB7)
+    GOTO    MAIN_LOOP
+
+LEDS_OFF:
+    CLRF    PORTB           ; Apaga todos os LEDs
+    GOTO    MAIN_LOOP
 
 ; ============================================================================== 
-; ROTINA DE DELAY (t segundos)
+; ROTINA DE DELAY (Anti-bounce e estabilização)
 ; ==============================================================================
 DELAY:
-    MOVLW   0xFF                            ; Ajuste fino do tempo de espera
-    MOVWF   DELAY_VAR1                      
+    MOVLW   0xFF
+    MOVWF   DELAY_VAR1
 DELAY_LOOP1:
-    MOVLW   0xFF                            
-    MOVWF   DELAY_VAR2                      
+    MOVLW   0xFF
+    MOVWF   DELAY_VAR2
 DELAY_LOOP2:
-    DECFSZ  DELAY_VAR2, F                   
-    GOTO    DELAY_LOOP2                     
-    DECFSZ  DELAY_VAR1, F                   
-    GOTO    DELAY_LOOP1                     
-    RETURN                                  
+    DECFSZ  DELAY_VAR2, F
+    GOTO    DELAY_LOOP2
+    DECFSZ  DELAY_VAR1, F
+    GOTO    DELAY_LOOP1
+    RETURN
 
-    END                                     ; Fim do programa
+    END

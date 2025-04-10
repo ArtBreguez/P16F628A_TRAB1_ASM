@@ -88,6 +88,13 @@ UPDATE_LEDS:
     ADDWF   TEMP, W         ; W = TEMP + W (2 * input)
     ADDWF   TEMP, W         ; W = TEMP + W (3 * input)
 
+    MOVWF   TEMP            ; Armazena o resultado em TEMP
+    SUBLW   0x10            ; Subtrai 16 do resultado
+    BTFSS   STATUS, C       ; Verifica se o resultado é menor que 16 (sem carry)
+    GOTO    LEDS_OFF        ; Se for maior ou igual a 16, vai para LEDS_OFF
+    MOVF    TEMP, W         ; Restaura o valor original em W
+
+
     ANDLW   b'00001111'     ; Máscara de 4 bits no resultado
 
 
